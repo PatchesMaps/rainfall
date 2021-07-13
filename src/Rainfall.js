@@ -14,6 +14,7 @@ class Rainfall extends React.Component {
   constructor(props) {
     super(props)
 
+    this.layerContainer = null
     this.canvas = React.createRef()
     this.container = React.createRef()
     this.transformContainer = React.createRef()
@@ -58,7 +59,7 @@ class Rainfall extends React.Component {
     this.worker = new Worker('/worker.js', { type: 'module', name: 'raincloud', credentials: 'same-origin' })
 
     const { map } = this.props
-    // create a vector layer and add to the map
+    const offscreen = this.canvas.current.transferControlToOffscreen()
     const aspect = new ImageWMS({
       url: 'https://elevation.nationalmap.gov:443/arcgis/services/3DEPElevation/ImageServer/WMSServer',
       params: {
@@ -82,24 +83,26 @@ class Rainfall extends React.Component {
     })
 
     const raindrops = new Layer({
-      title: 'Raindrops',
+      title: 'Rainfall',
       render: (frameState) => {
-        if (!this.container) {
-          this.container = document.createElement('div')
-          this.container.style.position = 'absolute'
-          this.container.style.width = '100%'
-          this.container.style.height = '100%'
-          this.transformContainer = document.createElement('div')
-          this.transformContainer.style.position = 'absolute'
-          this.transformContainer.style.width = '100%'
-          this.transformContainer.style.height = '100%'
-          this.container.appendChild(this.transformContainer)
-          this.canvas = document.createElement('canvas')
-          this.canvas.style.position = 'absolute'
-          this.canvas.style.left = '0'
-          this.canvas.style.transformOrigin = 'top left'
-          this.transformContainer.appendChild(this.canvas)
-        }
+        // if (!this.layerContainer) {
+        //   this.layerContainer = document.createElement('div')
+        //   this.layerContainer.style.position = 'absolute'
+        //   this.layerContainer.style.width = '100%'
+        //   this.layerContainer.style.height = '100%'
+        //   const layerTransformContainer = document.createElement('div')
+
+        //   layerTransformContainer.style.position = 'absolute'
+        //   layerTransformContainer.style.width = '100%'
+        //   layerTransformContainer.style.height = '100%'
+        //   this.layerContainer.appendChild(layerTransformContainer)
+        //   const layerCanvas = document.createElement('canvas')
+
+        //   layerCanvas.style.position = 'absolute'
+        //   layerCanvas.style.left = '0'
+        //   layerCanvas.style.transformOrigin = 'top left'
+        //   layerTransformContainer.appendChild(layerCanvas)
+        // }
         this.mainThreadFrameState = frameState
         this.updateContainerTransform()
         if (!this.rendering) {
@@ -107,10 +110,13 @@ class Rainfall extends React.Component {
           this.worker.postMessage({
             action: 'render',
             frameState: JSON.parse(stringify(frameState)),
-          })
+            canvas: offscreen,
+            dpr: window.devicePixelRatio
+          }, [offscreen])
         } else {
           frameState.animate = true
         }
+
         return this.container.current
       },
       source: new Source({
@@ -161,7 +167,6 @@ class Rainfall extends React.Component {
 
     // this.addLayer(aspectLayer)
     this.addLayer(raindrops)
-    // this.addLayer(aspectLayer)
   }
 
   addLayer(layer) {
@@ -180,6 +185,9 @@ class Rainfall extends React.Component {
     const { map } = this.props
     const target = map.getTargetElement()
     const boundingRect = target.getBoundingClientRect()
+    // console.log('target.id:', `#${target.id} .ol-unselectable .ol-layers`)
+    // const layersContainer = document.querySelector(`#${target.id} .ol-unselectable .ol-layers`)
+    // console.log('layersContainer:', layersContainer)
     return ReactDOM.createPortal(
       <Container ref={this.container}>
         <TransformContainer ref={this.transformContainer}>
